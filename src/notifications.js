@@ -83,35 +83,50 @@ Notifications.getMultiple = async function (nids) {
 
 	const userKeys = notifications.map(n => n && n.from);
 	const usersData = await User.getUsersFields(userKeys, ['username', 'userslug', 'picture']);
-
-	notifications.forEach((notification, index) => {
-		if (notification) {
-			intFields.forEach((field) => {
-				if (notification.hasOwnProperty(field)) {
-					notification[field] = parseInt(notification[field], 10) || 0;
-				}
-			});
-			if (notification.path && !notification.path.startsWith('http')) {
-				notification.path = nconf.get('relative_path') + notification.path;
-			}
-			notification.datetimeISO = utils.toISOString(notification.datetime);
-
-			if (notification.bodyLong) {
-				notification.bodyLong = utils.stripHTMLTags(notification.bodyLong, ['img', 'p', 'a']);
-			}
-
-			notification.user = usersData[index];
-			if (notification.user && notification.from) {
-				notification.image = notification.user.picture || null;
-				if (notification.user.username === '[[global:guest]]') {
-					notification.bodyShort = notification.bodyShort.replace(/([\s\S]*?),[\s\S]*?,([\s\S]*?)/, '$1, [[global:guest]], $2');
-				}
-			} else if (notification.image === 'brand:logo' || !notification.image) {
-				notification.image = meta.config['brand:logo'] || `${nconf.get('relative_path')}/logo.png`;
-			}
+	// fixing first function to refactor
+	function processNotification(notification, index, usersData) {
+		if (!notification) {
+			return;
 		}
+		parseIntFields(notification);
+		processNotificationPath(notification);
+		notification.datetimeISO = utils.toISOString(notification.datetime);
+		processNotificationBody(notification);
+		notification.user = usersData[index];
+		processNotificationImage(notification);
+	}
+	function parseIntFields(notification) {
+		intFields.forEach((field) => {
+			if (notification.hasOwnProperty(field)) {
+				notification[field] = parseInt(notification[field], 10) || 0;
+			}
+		});
+	}
+	function processNotificationPath(notification) {
+		if (notification.path && !notification.path.startsWith('http')) {
+			notification.path = nconf.get('relative_path') + notification.path;
+		}
+	}
+	function processNotificationBody(notification) {
+		if (notification.bodyLong) {
+			notification.bodyLong = utils.stripHTMLTags(notification.bodyLong, ['img', 'p', 'a']);
+		}
+	}
+	function processNotificationImage(notification) {
+		if (notification.user && notification.from) {
+			notification.image = notification.user.picture || null;
+			if (notification.user.username === '[[global:guest]]') {
+				notification.bodyShort = notification.bodyShort.replace(/([\s\S]*?),[\s\S]*?,([\s\S]*?)/, '$1, [[global:guest]], $2');
+			}
+		} else if (notification.image === 'brand:logo' || !notification.image) {
+			notification.image = meta.config['brand:logo'] || `${nconf.get('relative_path')}/logo.png`;
+		}
+	}
+	notifications.forEach((notification, index) => {
+		processNotification(notification, index, usersData);
 	});
 	return notifications;
+	// We end the function here
 };
 
 Notifications.filterExists = async function (nids) {
